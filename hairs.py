@@ -7,6 +7,8 @@ import time
 import os
 import numpy
 import time
+from stl import Solid, Facet, Vector3d
+
 
 class Cilium:
     # Apologies if this is ugly, I'm not familiar with Python classes
@@ -20,7 +22,7 @@ class Cilium:
         self.angle = angle
         self.slant = slant
         # TODO add profile
-        self.pixelArray = [[255 for x in range(width)] for y in range(width)] # 255 for white
+        self.pixelArray = [[True for x in range(width)] for y in range(width)]
         self.number_of_pixels = width * width # Actually a float where
                                               # ceil(number_of_pixels) is
                                               # the real number of pixels
@@ -39,12 +41,12 @@ class Cilium:
         for i in range(
                 math.ceil(old_number_of_pixels) - math.ceil(self.number_of_pixels)
         ):
-            self.pixelArray[self.y][self.x] = 0 # 0 for false
+            self.pixelArray[self.y][self.x] = False
             if (self.number_of_pixels) <= 0:
                 break
             new_x, new_y = self.x + self.dx, self.y + self.dy
             if (0 <= new_x < self.width and 0 <= new_y < self.width
-                    and self.pixelArray[new_y][new_x] == 255): # 255 for white
+                    and self.pixelArray[new_y][new_x] == True):
                 self.x, self.y = new_x, new_y
             else:
                 self.dx, self.dy = -1 * self.dy, self.dx
@@ -61,25 +63,23 @@ def print_array(array):
     print()
 
 def print_same_direction(width, height, angle, slant, gap, quantity_top,
-        quantity_left, buffer=0, animate=False, save_image=False):
+        quantity_left, buffer=0,
+        animate=False, save_image=False, save_3d_model=False,
+        xy_res=.06, z_res=.02):
     buffer += int(height * slant)
-    print(buffer)
+    # print(buffer)
     hairs = [[Cilium(
             width, height, angle, slant,
             position=((width + gap) * x, (width + gap) * y)
         ) for x in range(quantity_top)]
         for y in range(quantity_left)
     ]
+    layers = []
     if save_image:
         folder_path = "ImagesFromEpoch" + str(int(time.time()))
         os.makedirs(folder_path)
-    # for x in range(height):
-    #     for row in hairs:
-    #         for hair in row:
-    #             layer, lol1, lol2 = hair.get_new_layer()
-    #             print_array(layer)
-    for i in range(height): # TODO CHANGE 1 TO HEIGHT # For every layer
-        picture_array = [[0 for x in range((width + gap) * quantity_top + 2 * buffer)] # 0 for black
+    for i in range(height): # For every layer
+        picture_array = [[False for x in range((width + gap) * quantity_top + 2 * buffer)]
             for y in range((width + gap) * quantity_left + 2 * buffer)
         ]
         # would be MUCH improved with matrix operations
@@ -98,15 +98,114 @@ def print_same_direction(width, height, angle, slant, gap, quantity_top,
                         + hair_array[y]
                         + picture_array[big_row][end:])
         if save_image:
-            img = png.fromarray(picture_array, mode='L')
-            img.save(folder_path + '/' + str(i) +'.png')
+            new_picture = picture_array[:]
+            # for y in range(len(new_picture)):
+            #     for x in range(len(new_picture[y])):
+            #         (new_picture[y][x] = 255) if new_picture[y][x] else (new_picture[y][x] = 0)
+            # img = png.fromarray(picture_array, mode='L')
+            # img.save(folder_path + '/' + str(i) +'.png')
         if animate:
             print_array(picture_array)
             time.sleep(.25)
             os.system('cls')
-
+        if save_3d_model:
+            layers.append(picture_array)
+    if save_3d_model:
+        structure = Solid(name='structure')
+        for z in range(len(layers)):
+            for y in range(len(layers[z])):
+                for x in range(len(layers[z][y])):
+                    if layers[z][y][x]:
+                        # South
+                        if y == 0 or not layers[z][y-1][x]:
+                            structure.add_facet(Vector3d(0, -1, 0),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
+                                ])
+                            structure.add_facet(Vector3d(0, -1, 0),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
+                                ])
+                        # Down
+                        if z == 0 or not layers[z-1][y][x]:
+                            structure.add_facet(Vector3d(0, 0, -1),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res)
+                                ])
+                            structure.add_facet(Vector3d(0, 0, -1),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res)
+                                ])
+                        # East
+                        if x == len(layers[z][y]) - 1 or not layers[z][y][x+1]:
+                            structure.add_facet(Vector3d(1, 0, 0),
+                                [
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
+                                ])
+                            structure.add_facet(Vector3d(1, 0, 0),
+                                [
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res)
+                                ])
+                        # Up
+                        if z == len(layers) - 1 or not layers[z+1][y][x]:
+                            structure.add_facet(Vector3d(0, 0, 1),
+                                [
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
+                                ])
+                            structure.add_facet(Vector3d(0, 0, 1),
+                                [
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
+                                ])
+                        # West
+                        if x == 0 or not layers[z][y][x-1]:
+                            structure.add_facet(Vector3d(-1, 0, 0),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res)
+                                ])
+                            structure.add_facet(Vector3d(-1, 0, 0),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
+                                ])
+                        # North
+                        if y == len(layers) - 1 or not layers[z][y+1][x]:
+                            structure.add_facet(Vector3d(0, 1, 0),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res)
+                                ])
+                            structure.add_facet(Vector3d(0, 1, 0),
+                                [
+                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res)
+                                ])
+        with open('hair' + str(width) + str(height) + str(angle) + str(slant)
+                + str(gap) + str(quantity_top) + str(quantity_left)
+                + '.stl', 'wb') as f:
+            structure.write_ascii(f)
 if __name__ == "__main__":
     print_same_direction(
-        width=3, height=32, angle=0, slant=.13, gap=1,
+        width=5, height=256, angle=0, slant=.1, gap=2,
         quantity_top=2, quantity_left=2, buffer=0,
-        animate=True, save_image=False)
+        animate=False, save_image=False, save_3d_model=True)
