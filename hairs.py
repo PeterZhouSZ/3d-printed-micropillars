@@ -105,11 +105,14 @@ def print_same_direction(width, height, angle, slant, gap, quantity_top,
                         + picture_array[big_row][end:])
         if save_image:
             new_picture = picture_array[:]
-            # for y in range(len(new_picture)):
-            #     for x in range(len(new_picture[y])):
-            #         (new_picture[y][x] = 255) if new_picture[y][x] else (new_picture[y][x] = 0)
-            # img = png.fromarray(picture_array, mode='L')
-            # img.save(folder_path + '/' + str(i) +'.png')
+            for y in range(len(new_picture)):
+                for x in range(len(new_picture[y])):
+                    if new_picture[y][x]:
+                        new_picture[y][x] = 255
+                    else:
+                        new_picture[y][x] = 0
+            img = png.fromarray(picture_array, mode='L')
+            img.save(folder_path + '/' + str(i) +'.png')
         if animate:
             print_array(picture_array)
             time.sleep(.25)
@@ -220,9 +223,9 @@ def fastSTL(layers, xy_res, z_res):
     big_mesh.save('hairs' + str(int(time.time())) + '.stl')
 if __name__ == "__main__":
     print_same_direction(
-        width=10, height=256, angle=0, slant=.03, gap=10,
+        width=5, height=40, angle=0, slant=.1, gap=6,
         quantity_top=5, quantity_left=5, buffer=0,
-        animate=False, save_image=False, save_3d_model=True)
+        animate=False, save_image=True, save_3d_model=True)
 # def slowSTL(layers):
 #     structure = Solid(name='structure')
 #     for z in range(len(layers)):
