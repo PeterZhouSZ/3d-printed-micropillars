@@ -7,7 +7,9 @@ import time
 import os
 import numpy
 import time
-from stl import Solid, Facet, Vector3d
+from stl import mesh
+import cProfile
+import numpy as np
 
 
 class Cilium:
@@ -63,9 +65,9 @@ def print_array(array):
     print()
 
 def print_same_direction(width, height, angle, slant, gap, quantity_top,
-        quantity_left, buffer=0,
+        quantity_left, buffer=0, base_height=3,
         animate=False, save_image=False, save_3d_model=False,
-        xy_res=.06, z_res=.02):
+        xy_res=.05, z_res=.05):
     buffer += int(height * slant)
     # print(buffer)
     hairs = [[Cilium(
@@ -78,6 +80,10 @@ def print_same_direction(width, height, angle, slant, gap, quantity_top,
     if save_image:
         folder_path = "ImagesFromEpoch" + str(int(time.time()))
         os.makedirs(folder_path)
+    for i in range(base_height):
+        layers.append([[True for x in range((width + gap) * quantity_top + 2 * buffer)]
+            for y in range((width + gap) * quantity_left + 2 * buffer)
+        ])
     for i in range(height): # For every layer
         picture_array = [[False for x in range((width + gap) * quantity_top + 2 * buffer)]
             for y in range((width + gap) * quantity_left + 2 * buffer)
@@ -111,101 +117,203 @@ def print_same_direction(width, height, angle, slant, gap, quantity_top,
         if save_3d_model:
             layers.append(picture_array)
     if save_3d_model:
-        structure = Solid(name='structure')
-        for z in range(len(layers)):
-            for y in range(len(layers[z])):
-                for x in range(len(layers[z][y])):
-                    if layers[z][y][x]:
-                        # South
-                        if y == 0 or not layers[z][y-1][x]:
-                            structure.add_facet(Vector3d(0, -1, 0),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
-                                ])
-                            structure.add_facet(Vector3d(0, -1, 0),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
-                                ])
-                        # Down
-                        if z == 0 or not layers[z-1][y][x]:
-                            structure.add_facet(Vector3d(0, 0, -1),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res)
-                                ])
-                            structure.add_facet(Vector3d(0, 0, -1),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res)
-                                ])
-                        # East
-                        if x == len(layers[z][y]) - 1 or not layers[z][y][x+1]:
-                            structure.add_facet(Vector3d(1, 0, 0),
-                                [
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
-                                ])
-                            structure.add_facet(Vector3d(1, 0, 0),
-                                [
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res)
-                                ])
-                        # Up
-                        if z == len(layers) - 1 or not layers[z+1][y][x]:
-                            structure.add_facet(Vector3d(0, 0, 1),
-                                [
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
-                                ])
-                            structure.add_facet(Vector3d(0, 0, 1),
-                                [
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
-                                ])
-                        # West
-                        if x == 0 or not layers[z][y][x-1]:
-                            structure.add_facet(Vector3d(-1, 0, 0),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res)
-                                ])
-                            structure.add_facet(Vector3d(-1, 0, 0),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
-                                ])
-                        # North
-                        if y == len(layers) - 1 or not layers[z][y+1][x]:
-                            structure.add_facet(Vector3d(0, 1, 0),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res)
-                                ])
-                            structure.add_facet(Vector3d(0, 1, 0),
-                                [
-                                    Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
-                                    Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res)
-                                ])
-        with open('hair' + str(width) + str(height) + str(angle) + str(slant)
-                + str(gap) + str(quantity_top) + str(quantity_left)
-                + '.stl', 'wb') as f:
-            structure.write_ascii(f)
+        fastSTL(layers, xy_res, z_res)
+
+def fastSTL(layers, xy_res, z_res):
+    voxels = 0
+    i = 0
+    for z in range(len(layers)):
+        for y in range(len(layers[z])):
+            for x in range(len(layers[z][y])):
+                if layers[z][y][x]:
+                    voxels += 1
+    data = numpy.zeros(voxels * 12, dtype=mesh.Mesh.dtype)
+    for z in range(len(layers)):
+        for y in range(len(layers[z])):
+            for x in range(len(layers[z][y])):
+                if layers[z][y][x]:
+                    if y == 0 or not layers[z][y-1][x]:
+                        data['vectors'][i + 0] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + 0, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res]
+                            ])
+                        data['vectors'][i + 1] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + 0, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res],
+                                [x * xy_res + 0, y * xy_res + 0, z_res + z * z_res]
+                            ])
+                    # Down
+                    if z == 0 or not layers[z-1][y][x]:
+                        data['vectors'][i + 2] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res]
+                            ])
+                        data['vectors'][i + 3] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res],
+                                [x * xy_res + 0, y * xy_res + 0, 0 + z * z_res]
+                            ])
+                    # East
+                    if x == len(layers[z][y]) - 1 or not layers[z][y][x+1]:
+                        data['vectors'][i + 4] = numpy.array(
+                            [
+                                [x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res]
+                            ])
+                        data['vectors'][i + 5] = numpy.array(
+                            [
+                                [x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res]
+                            ])
+                    # Up
+                    if z == len(layers) - 1 or not layers[z+1][y][x]:
+                        data['vectors'][i + 6] = numpy.array(
+                            [
+                                [x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + 0, y * xy_res + 0, z_res + z * z_res]
+                            ])
+                        data['vectors'][i + 7] = numpy.array(
+                            [
+                                [x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + 0, y * xy_res + 0, z_res + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res]
+                            ])
+                    # West
+                    if x == 0 or not layers[z][y][x-1]:
+                        data['vectors'][i + 8] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + 0, y * xy_res + 0, 0 + z * z_res]
+                            ])
+                        data['vectors'][i + 9] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + 0, y * xy_res + 0, 0 + z * z_res],
+                                [x * xy_res + 0, y * xy_res + 0, z_res + z * z_res]
+                            ])
+                    # North
+                    if y == len(layers[z]) - 1 or not layers[z][y+1][x]:
+                        data['vectors'][i + 10] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res]
+                            ])
+                        data['vectors'][i + 11] = numpy.array(
+                            [
+                                [x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res],
+                                [x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res]
+                            ])
+                    i += 12
+    big_mesh = mesh.Mesh(data)
+    big_mesh.save('hairs' + str(int(time.time())) + '.stl')
 if __name__ == "__main__":
     print_same_direction(
-        width=5, height=256, angle=0, slant=.1, gap=2,
-        quantity_top=2, quantity_left=2, buffer=0,
+        width=10, height=256, angle=0, slant=.03, gap=10,
+        quantity_top=5, quantity_left=5, buffer=0,
         animate=False, save_image=False, save_3d_model=True)
+# def slowSTL(layers):
+#     structure = Solid(name='structure')
+#     for z in range(len(layers)):
+#         for y in range(len(layers[z])):
+#             for x in range(len(layers[z][y])):
+#                 if layers[z][y][x]:
+#                     # South
+#                     if y == 0 or not layers[z][y-1][x]:
+#                         structure.add_facet(Vector3d(0, -1, 0),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
+#                             ])
+#                         structure.add_facet(Vector3d(0, -1, 0),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
+#                             ])
+#                     # Down
+#                     if z == 0 or not layers[z-1][y][x]:
+#                         structure.add_facet(Vector3d(0, 0, -1),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res)
+#                             ])
+#                         structure.add_facet(Vector3d(0, 0, -1),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res)
+#                             ])
+#                     # East
+#                     if x == len(layers[z][y]) - 1 or not layers[z][y][x+1]:
+#                         structure.add_facet(Vector3d(1, 0, 0),
+#                             [
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
+#                             ])
+#                         structure.add_facet(Vector3d(1, 0, 0),
+#                             [
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, 0 + z * z_res)
+#                             ])
+#                     # Up
+#                     if z == len(layers) - 1 or not layers[z+1][y][x]:
+#                         structure.add_facet(Vector3d(0, 0, 1),
+#                             [
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
+#                             ])
+#                         structure.add_facet(Vector3d(0, 0, 1),
+#                             [
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + 0, z_res + z * z_res)
+#                             ])
+#                     # West
+#                     if x == 0 or not layers[z][y][x-1]:
+#                         structure.add_facet(Vector3d(-1, 0, 0),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res)
+#                             ])
+#                         structure.add_facet(Vector3d(-1, 0, 0),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + 0, z_res + z * z_res)
+#                             ])
+#                     # North
+#                     if y == len(layers) - 1 or not layers[z][y+1][x]:
+#                         structure.add_facet(Vector3d(0, 1, 0),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res)
+#                             ])
+#                         structure.add_facet(Vector3d(0, 1, 0),
+#                             [
+#                                 Vector3d(x * xy_res + 0, y * xy_res + xy_res, 0 + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, z_res + z * z_res),
+#                                 Vector3d(x * xy_res + xy_res, y * xy_res + xy_res, 0 + z * z_res)
+#                             ])
+#     with open('hair' + str(width) + str(height) + str(angle) + str(slant)
+#             + str(gap) + str(quantity_top) + str(quantity_left)
+#             + '.stl', 'wb') as f:
+#         structure.write_binary(f)
